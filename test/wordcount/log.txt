@@ -1,0 +1,72 @@
+Usage: WordCount --input <path> --output <path>
+05/23/2016 20:34:38	Job execution switched to status RUNNING.
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to SCHEDULED 
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to DEPLOYING 
+05/23/2016 20:34:38	Keyed Aggregation -> Sink: Unnamed(1/1) switched to SCHEDULED 
+05/23/2016 20:34:38	Keyed Aggregation -> Sink: Unnamed(1/1) switched to DEPLOYING 
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to RUNNING 
+05/23/2016 20:34:38	Keyed Aggregation -> Sink: Unnamed(1/1) switched to RUNNING 
+05/23/2016 20:34:38	Keyed Aggregation -> Sink: Unnamed(1/1) switched to FAILED 
+java.io.IOException: File or directory already exists. Existing files and directories are not overwritten in NO_OVERWRITE mode. Use OVERWRITE mode to overwrite existing files and directories.
+	at org.apache.flink.core.fs.FileSystem.initOutPathLocalFS(FileSystem.java:595)
+	at org.apache.flink.api.common.io.FileOutputFormat.open(FileOutputFormat.java:227)
+	at org.apache.flink.api.java.io.TextOutputFormat.open(TextOutputFormat.java:78)
+	at org.apache.flink.streaming.api.functions.sink.OutputFormatSinkFunction.open(OutputFormatSinkFunction.java:60)
+	at org.apache.flink.api.common.functions.util.FunctionUtils.openFunction(FunctionUtils.java:38)
+	at org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator.open(AbstractUdfStreamOperator.java:91)
+	at org.apache.flink.streaming.runtime.tasks.StreamTask.openAllOperators(StreamTask.java:317)
+	at org.apache.flink.streaming.runtime.tasks.StreamTask.invoke(StreamTask.java:215)
+	at org.apache.flink.runtime.taskmanager.Task.run(Task.java:559)
+	at java.lang.Thread.run(Thread.java:745)
+
+05/23/2016 20:34:38	Job execution switched to status FAILING.
+java.io.IOException: File or directory already exists. Existing files and directories are not overwritten in NO_OVERWRITE mode. Use OVERWRITE mode to overwrite existing files and directories.
+	at org.apache.flink.core.fs.FileSystem.initOutPathLocalFS(FileSystem.java:595)
+	at org.apache.flink.api.common.io.FileOutputFormat.open(FileOutputFormat.java:227)
+	at org.apache.flink.api.java.io.TextOutputFormat.open(TextOutputFormat.java:78)
+	at org.apache.flink.streaming.api.functions.sink.OutputFormatSinkFunction.open(OutputFormatSinkFunction.java:60)
+	at org.apache.flink.api.common.functions.util.FunctionUtils.openFunction(FunctionUtils.java:38)
+	at org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator.open(AbstractUdfStreamOperator.java:91)
+	at org.apache.flink.streaming.runtime.tasks.StreamTask.openAllOperators(StreamTask.java:317)
+	at org.apache.flink.streaming.runtime.tasks.StreamTask.invoke(StreamTask.java:215)
+	at org.apache.flink.runtime.taskmanager.Task.run(Task.java:559)
+	at java.lang.Thread.run(Thread.java:745)
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to CANCELING 
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to CANCELED 
+05/23/2016 20:34:38	Job execution switched to status FAILED.
+Usage: WordCount --input <path> --output <path>
+05/23/2016 20:34:38	Job execution switched to status RUNNING.
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to SCHEDULED 
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to DEPLOYING 
+05/23/2016 20:34:38	Keyed Aggregation -> Sink: Unnamed(1/1) switched to SCHEDULED 
+05/23/2016 20:34:38	Keyed Aggregation -> Sink: Unnamed(1/1) switched to DEPLOYING 
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to RUNNING 
+05/23/2016 20:34:38	Keyed Aggregation -> Sink: Unnamed(1/1) switched to RUNNING 
+05/23/2016 20:34:38	Keyed Aggregation -> Sink: Unnamed(1/1) switched to FAILED 
+java.io.IOException: File or directory already exists. Existing files and directories are not overwritten in NO_OVERWRITE mode. Use OVERWRITE mode to overwrite existing files and directories.
+	at org.apache.flink.core.fs.FileSystem.initOutPathLocalFS(FileSystem.java:595)
+	at org.apache.flink.api.common.io.FileOutputFormat.open(FileOutputFormat.java:227)
+	at org.apache.flink.api.java.io.TextOutputFormat.open(TextOutputFormat.java:78)
+	at org.apache.flink.streaming.api.functions.sink.OutputFormatSinkFunction.open(OutputFormatSinkFunction.java:60)
+	at org.apache.flink.api.common.functions.util.FunctionUtils.openFunction(FunctionUtils.java:38)
+	at org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator.open(AbstractUdfStreamOperator.java:91)
+	at org.apache.flink.streaming.runtime.tasks.StreamTask.openAllOperators(StreamTask.java:317)
+	at org.apache.flink.streaming.runtime.tasks.StreamTask.invoke(StreamTask.java:215)
+	at org.apache.flink.runtime.taskmanager.Task.run(Task.java:559)
+	at java.lang.Thread.run(Thread.java:745)
+
+05/23/2016 20:34:38	Job execution switched to status FAILING.
+java.io.IOException: File or directory already exists. Existing files and directories are not overwritten in NO_OVERWRITE mode. Use OVERWRITE mode to overwrite existing files and directories.
+	at org.apache.flink.core.fs.FileSystem.initOutPathLocalFS(FileSystem.java:595)
+	at org.apache.flink.api.common.io.FileOutputFormat.open(FileOutputFormat.java:227)
+	at org.apache.flink.api.java.io.TextOutputFormat.open(TextOutputFormat.java:78)
+	at org.apache.flink.streaming.api.functions.sink.OutputFormatSinkFunction.open(OutputFormatSinkFunction.java:60)
+	at org.apache.flink.api.common.functions.util.FunctionUtils.openFunction(FunctionUtils.java:38)
+	at org.apache.flink.streaming.api.operators.AbstractUdfStreamOperator.open(AbstractUdfStreamOperator.java:91)
+	at org.apache.flink.streaming.runtime.tasks.StreamTask.openAllOperators(StreamTask.java:317)
+	at org.apache.flink.streaming.runtime.tasks.StreamTask.invoke(StreamTask.java:215)
+	at org.apache.flink.runtime.taskmanager.Task.run(Task.java:559)
+	at java.lang.Thread.run(Thread.java:745)
+05/23/2016 20:34:38	Source: Read Text File Source -> Flat Map(1/1) switched to CANCELING 
+05/23/2016 20:34:39	Source: Read Text File Source -> Flat Map(1/1) switched to CANCELED 
+05/23/2016 20:34:39	Job execution switched to status FAILED.

@@ -1,0 +1,13 @@
+2016-05-23 22:28:33-04:00
+Usage: WordCount --input <path> --output <path>
+05/23/2016 22:28:34	Job execution switched to status RUNNING.
+05/23/2016 22:28:34	Source: Read Text File Source -> Flat Map(1/1) switched to SCHEDULED 
+05/23/2016 22:28:34	Source: Read Text File Source -> Flat Map(1/1) switched to DEPLOYING 
+05/23/2016 22:28:34	Keyed Aggregation -> Sink: Unnamed(1/1) switched to SCHEDULED 
+05/23/2016 22:28:34	Keyed Aggregation -> Sink: Unnamed(1/1) switched to DEPLOYING 
+05/23/2016 22:28:34	Source: Read Text File Source -> Flat Map(1/1) switched to RUNNING 
+05/23/2016 22:28:34	Keyed Aggregation -> Sink: Unnamed(1/1) switched to RUNNING 
+05/23/2016 22:28:35	Source: Read Text File Source -> Flat Map(1/1) switched to FINISHED 
+05/23/2016 22:28:35	Keyed Aggregation -> Sink: Unnamed(1/1) switched to FINISHED 
+05/23/2016 22:28:35	Job execution switched to status FINISHED.
+2016-05-23 22:28:35-04:00
