@@ -1,1 +1,2 @@
-/home/tan/projects/FlinkYarn/build-target/bin/start-local.sh
+./../build-target/bin/start-local.sh
+
