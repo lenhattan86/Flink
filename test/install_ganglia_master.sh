@@ -11,8 +11,5 @@ sudo vi /etc/ganglia/gmetad.conf
 sudo vi /etc/ganglia/gmond.conf
 # modify cluster, udp_send_channel sections
 
-# install & activate PHP lib
-#sudo apt install libapache2-mod-php7.0
-
 # restart all related services
 sudo service ganglia-monitor restart & sudo service gmetad restart & sudo service apache2 restart
