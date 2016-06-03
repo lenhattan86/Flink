@@ -1,5 +1,7 @@
 #!/bin/bash
 
+
+
 java_home='/usr/lib/jvm/java-8-oracle'
 
 hadoopVer="hadoop-2.7.0"
@@ -13,6 +15,9 @@ flinkDownloadLink="http://apache.mesi.com.ar/flink/flink-1.0.3/flink-1.0.3-bin-h
 flinkSrc="/home/tan/projects/Flink"
 testCase="/home/tan/projects/Flink/test/wordcount"
 
+REBOOT=false
+
+isTest=false
 
 isInitPath=false
 
@@ -24,17 +29,28 @@ isInstallJava=false
 
 isInstallGanglia=false
 startGanglia=true
+if $isInstallGanglia
+then
+	startGanglia=true
+fi
 
 isInstallHadoop=false
 isModifyHadoop=false
 
 isShutDownHadoop=false
 restartHadoop=true
+if $isInstallHadoop
+then
+	isShutDownHadoop=true
+	restartHadoop=true
+fi
 
 isUploadFlink=false
 isModifyFlink=false
-startFlink=true
+startFlinkYarn=true
 shudownFlink=false
+
+startFlinkStandalone=false # not necessary
 
 isUploadTestCase=false
 
@@ -43,7 +59,7 @@ isRun=false
 
 # refer ~/.ssh/config
 #master worker01 worker02 worker03 worker04 worker05 worker06 worker07 worker08"
-isTest=false
+
 
 masterNode="nm"
 clientNode="ctl"
@@ -57,6 +73,15 @@ else
 	numOfworkers=8
 	serverList="nm cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8"
 	slaveNodes="cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8"
+fi
+
+############### REBOOT all servers #############################
+if $REBOOT
+then
+	for server in $serverList; do		
+		echo reboot server $server
+		ssh tanle@$server "ssh $server 'sudo reboot'"
+	done
 fi
 
 ################################# passwordless SSH ####################################
@@ -98,24 +123,18 @@ then
 		ssh tanle@$server 'sudo apt-get install oracle-java8-installer'
 		ssh tanle@$server 'sudo update-alternatives --config java'
 		ssh tanle@$server 'sudo update-alternatives --config javac'
-		# set JAVA_HOME
-		#ssh tanle@$server 'echo JAVA_HOME="/usr/lib/jvm/java-8-oracle" >> /etc/environment'
-		#ssh tanle@$server "source /etc/environment"
+		#ssh tanle@$server "echo export JAVA_HOME=$java_home >> .bashrc"	
 	done
-	#ssh tanle@$server 'export JAVA_HOME=/usr/local/jdk1.6.0_18'
-	
 fi
-
 
 ################################# install Ganglia ###################################
 # Master
 
-
 if $isInstallGanglia
 then
-	echo "TODO: install Ganglia"
 	echo "Configure Ganglia master node $masterNode"
-	#ssh tanle@$masterNode 'sudo apt-get autoremove ganglia-monitor rrdtool gmetad ganglia-webfrontend'
+	#ssh tanle@$masterNode 'yes Y | sudo apt-get autoremove ganglia-monitor rrdtool gmetad ganglia-webfrontend'
+	### PLZ manually install Ganglia as we need to respond to some pop-ups
 	#ssh tanle@$masterNode 'sudo apt-get install -y ganglia-monitor rrdtool gmetad ganglia-webfrontend'
 	# we may restart the Apache2 twice
 	# 
@@ -125,10 +144,11 @@ then
 	#ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"sbu flink\" 1 localhost/data_source \"sbu flink\" 1 mn cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8/g' /etc/ganglia/gmetad.conf"
 	if $isTest
 		ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"sbu flink\" 1 mn cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8/data_source \"sbu flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
-#		ssh tanle@$masterNode "sudo sed -i -e 's/data_source \'my cluster\" localhost/data_source \"sbu flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
+#		ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"my cluster\" localhost/data_source \"sbu flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
 
 	then
-		ssh tanle@$masterNode "sudo sed -i -e 's/data_source \'my cluster\" localhost/data_source \"SBU Flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
+		#ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"my cluster\" localhost/data_source \"SBU Flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
+		ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"sbu flink\" 1 localhost/data_source \"SBU Flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
 	fi
 	#The gmond.conf file configures where the node sends its information.
 	#ssh tanle@$masterNode 'sudo vi /etc/ganglia/gmond.conf' # modify cluster, udp_send_channel sections
@@ -137,10 +157,12 @@ fi
 
 if $startGanglia
 then
+	echo restart Ganglia
 	# restart all related services
 	ssh tanle@$masterNode 'sudo service ganglia-monitor restart & sudo service gmetad restart & sudo service apache2 restart'
 	for server in $slaveNodes; do
-		#ssh tanle@$server 'sudo apt-get install -y ganglia-monitor'
+		#ssh tanle@$server 'yes Y | sudo apt-get install -y ganglia-monitor'
+		#ssh tanle@$server 'yes Y | sudo apt-get install -y ganglia-monitor'
 		#ssh tanle@$server 'sudo vi /etc/ganglia/gmond.conf'
 		# modify cluster, udp_send_channel sections : unspecified -> SBU Flink
 		# comment out udp_recv_channel
@@ -148,7 +170,6 @@ then
 		ssh tanle@$server 'sudo service ganglia-monitor restart' 
 	done	
 fi
-
 
 #################################### Hadoop Yarn ####################################
 if $isShutDownHadoop
@@ -172,19 +193,22 @@ echo "==========install Hadoop Yarn=========="
 		echo "TODO: enter the hadoop source code folder"	
 	else
 		for server in $serverList; do
-			echo Set up Hadoop at $server			
-			#ssh tanle@$server "rm -rf $hadoopTgz; wget $hadoopLink"
-			echo extract $hadoopTgz
-			ssh tanle@$server "rm -rf $hadoopVer; tar -xvzf $hadoopTgz >> log.txt"	
+			echo Set up Hadoop at $server
+			if $isInitPath
+			then				
+				ssh tanle@$server "rm -rf $hadoopTgz; wget $hadoopLink"
+			fi
+#			echo extract $hadoopTgz
+#			ssh tanle@$server "rm -rf $hadoopVer; tar -xvzf $hadoopTgz >> log.txt"	
 
 			# add JAVA_HOME
 			echo Configure Hadoop at $server
-			ssh tanle@$server "echo export JAVA_HOME=/usr/lib/jvm/java-8-oracle > temp.txt"			
+			ssh tanle@$server "echo export JAVA_HOME=$java_home > temp.txt"			
 			ssh tanle@$server "cat temp.txt ~/$hadoopVer/etc/hadoop/hadoop-env.sh > temp2.txt ; mv temp2.txt ~/$hadoopVer/etc/hadoop/hadoop-env.sh"
 
 			if $isInitPath
 			then	
-				ssh tanle@$server "echo export JAVA_HOME=/usr/lib/jvm/java-8-oracle >> .bashrc"				
+				ssh tanle@$server "echo export JAVA_HOME=$java_home >> .bashrc"				
 				# Administrators can configure individual daemons using the configuration options shown below in the table:	
 				#ssh tanle@$server 'echo export HADOOP_NAMENODE_OPTS="-XX:+UseParallelGC" > temp.txt'
 				#ssh tanle@$server "cat /$hadoopVer/etc/hadoop/hadoop-env.sh temp.txt > temp2.txt; mv temp2.txt /$hadoopVer/etc/hadoop/hadoop-env.sh"
@@ -219,14 +243,17 @@ echo "==========install Hadoop Yarn=========="
 			ssh tanle@$server "echo '<?xml version=\"1.0\" encoding=\"UTF-8\"?>'  > $hadoopVer/etc/hadoop/core-site.xml"
 			ssh tanle@$server "echo '<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>' >> $hadoopVer/etc/hadoop/core-site.xml"
 			ssh tanle@$server "echo '<configuration>' >> $hadoopVer/etc/hadoop/core-site.xml"
+
 			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/core-site.xml"
 			ssh tanle@$server "echo '    <name>fs.defaultFS</name>' >> $hadoopVer/etc/hadoop/core-site.xml"
 			ssh tanle@$server "echo '    <value>hdfs://$masterNode:9000/</value>' >> $hadoopVer/etc/hadoop/core-site.xml"
 			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/core-site.xml"
+
 			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/core-site.xml"
 			ssh tanle@$server "echo '    <name>io.file.buffer.size</name>' >> $hadoopVer/etc/hadoop/core-site.xml"
 			ssh tanle@$server "echo '    <value>131072</value>' >> $hadoopVer/etc/hadoop/core-site.xml"
 			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/core-site.xml"
+
 			ssh tanle@$server "echo '</configuration>' >> $hadoopVer/etc/hadoop/core-site.xml"
 
 
@@ -270,11 +297,11 @@ echo "==========install Hadoop Yarn=========="
 
 
 			#### Configurations for DataNode:
-#			ssh tanle@$server "rm -rf dfs.data.dir; mkdir dfs.data.dir"
-#			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
-#			ssh tanle@$server "echo '    <name>dfs.datanode.data.dir</name>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
-#			ssh tanle@$server "echo '    <value>~/dfs.data.dir</value>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
-#			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
+			ssh tanle@$server "sudo rm -rf /dev/hdfs; sudo mkdir /dev/hdfs"
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
+			ssh tanle@$server "echo '    <name>dfs.datanode.data.dir</name>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
+			ssh tanle@$server "echo '    <value>/share/hdfs</value>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
 
 			ssh tanle@$server "echo '</configuration>' >> $hadoopVer/etc/hadoop/hdfs-site.xml"
 
@@ -351,13 +378,13 @@ echo "==========install Hadoop Yarn=========="
 
 #			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
 #			ssh tanle@$server "echo '    <name>yarn.scheduler.minimum-allocation-mb</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '    <value>16</value>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+#			ssh tanle@$server "echo '    <value>128</value>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
 #			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
 
-#			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '    <name>yarn.scheduler.maximum-allocation-mb</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '    <value>4096</value>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '    <name>yarn.scheduler.maximum-allocation-mb</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '    <value>32768</value>' >> $hadoopVer/etc/hadoop/yarn-site.xml" #8192
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
 
 #			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"			
 #			ssh tanle@$server "echo '    <name>yarn.resourcemanager.nodes.include-path</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
@@ -371,15 +398,15 @@ echo "==========install Hadoop Yarn=========="
 
 
 			## Configurations for NodeManager:
-#			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '    <name>yarn.nodemanager.resource.memory-mb</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '    <value>65536</value>' >> $hadoopVer/etc/hadoop/yarn-site.xml" # 64GB
-#			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '    <name>yarn.nodemanager.resource.memory-mb</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '    <value>65536</value>' >> $hadoopVer/etc/hadoop/yarn-site.xml" # 64GB available in a node
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
 
-#			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '    <name>yarn.nodemanager.vmem-pmem-ratio</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '    <value>2.1</value>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
-#			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '    <name>yarn.nodemanager.vmem-pmem-ratio</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '    <value>4</value>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
 
 #			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
 #			ssh tanle@$server "echo '    <name>yarn.nodemanager.local-dirs</name>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
@@ -425,6 +452,52 @@ echo "==========install Hadoop Yarn=========="
 			ssh tanle@$server "echo '</configuration>' >> $hadoopVer/etc/hadoop/yarn-site.xml"
 
 			# etc/hadoop/mapred-site.xml
+			ssh tanle@$server "echo '<?xml version=\"1.0\"?>' > $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '<?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '<configuration>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <name>mapreduce.framework.name</name>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <value>yarn</value>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <name>mapreduce.map.memory.mb</name>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <value>1536</value>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+	
+
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <name>mapreduce.map.java.opts</name>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <value>-Xmx1024M</value>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+	
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <name>mapreduce.reduce.memory.mb</name>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <value>3072</value>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+	
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <name>mapreduce.reduce.java.opts</name>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <value>-Xmx2560M</value>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+	
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <name>mapreduce.task.io.sort.mb</name>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <value>512</value>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+	
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <name>mapreduce.task.io.sort.factor</name>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <value>100</value>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+	
+			ssh tanle@$server "echo '  <property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <name>mapreduce.reduce.shuffle.parallelcopies</name>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '    <value>50</value>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+			ssh tanle@$server "echo '  </property>' >> $hadoopVer/etc/hadoop/mapred-site.xml"
+	
+			ssh tanle@$server "echo '</configuration>' >> $hadoopVer/etc/hadoop/mapred-site.xml"			
 
 			# monitoring script in etc/hadoop/yarn-site.xml
 
@@ -448,7 +521,7 @@ then
 #	ssh tanle@$masterNode '$HADOOP_YARN_HOME/sbin/yarn-daemon.sh --config $HADOOP_CONF_DIR stop resourcemanager'
 #	ssh tanle@$masterNode '$HADOOP_YARN_HOME/sbin/yarn-daemons.sh --config $HADOOP_CONF_DIR stop nodemanager'
 	ssh tanle@$masterNode '$HADOOP_PREFIX/sbin/stop-yarn.sh'
-	ssh tanle@$masterNode '$HADOOP_YARN_HOME/sbin/yarn-daemon.sh --config $HADOOP_CONF_DIR stop proxyserver'
+#	ssh tanle@$masterNode '$HADOOP_YARN_HOME/sbin/yarn-daemon.sh --config $HADOOP_CONF_DIR stop proxyserver'
 #	ssh tanle@$masterNode '$HADOOP_PREFIX/sbin/mr-jobhistory-daemon.sh --config $HADOOP_CONF_DIR stop historyserver'
 	echo '============================ starting Hadoop==================================='
 	# operating HDFS
@@ -470,6 +543,7 @@ fi
 if $shudownFlink
 then
 	ssh $masterNode "$flinkVer/bin/stop-cluster.sh"
+	#ssh $masterNode "$hadoopVer/bin/yarn application -kill appplication_id"
 fi
 
 if $isUploadFlink 
@@ -481,64 +555,73 @@ then
 		cd ..
 		tar zcvf ../../../test/$flinkTar flink-1.0.3
 		cd ../../../test
+		
+		cd ..
+		tar zcvf $flinkTar $flinkVer 
+		for server in $serverList; do
+			scp $flinkTar tanle@$server:~/ 
+		done
+		ssh $server "tar -xvzf $flinkTar"
+		rm -rf flink*
 	else
 		wget $flinkDownloadLink
 		tar -xvzf $flinkTgz
 		cd $flinkVer
 	fi
 
-	#sudo apt-get install vim
-	#Replace localhost with resourcemanager in conf/flink-conf.yaml (jobmanager.rpc.address)
-	sed -i -e 's/jobmanager.rpc.address: localhost/jobmanager.rpc.address: nm/g' conf/flink-conf.yaml
-	#total amount of memory per machine
-	#sed -i -e 's/taskmanager.heap.mb: 512/taskmanager.heap.mb: 4096/g' conf/flink-conf.yaml
-	#sed -i -e 's/taskmanager.heap.mb: 512/taskmanager.heap.mb: 16384/g' conf/flink-conf.yaml
-	sed -i -e 's/taskmanager.heap.mb: 512/taskmanager.heap.mb: 32768/g' conf/flink-conf.yaml
-	#Setup the number of task slots = total number of CPUs/ machine
-	sed -i -e 's/taskmanager.numberOfTaskSlots: 1/taskmanager.numberOfTaskSlots: 32/g' conf/flink-conf.yaml
-	#Setup the threads = total number of CPUs in the cluster
-	#sed -i -e 's/parallelism.default: 1/parallelism.default: 256/g' conf/flink-conf.yaml
-	sed -i -e 's/parallelism.default: 1/parallelism.default: 8/g' conf/flink-conf.yaml
-	#Add hostnames of all worker nodes to the slaves file conf/slaves
-	rm -rf conf/slaves
-	for slave in $slaveNodes; do
-		echo $slave >> conf/slaves
-	done	
-
-	cd ..
-	tar zcvf $flinkTar $flinkVer 
 
 	for server in $serverList; do
-		ssh $server "rm -rf flink*"
-		scp $flinkTar tanle@$server:~/ 
-		ssh $server "tar -xvzf $flinkTar"
+		#ssh $server "rm -rf $flinkTgz; wget $flinkDownloadLink"
+		ssh $server "rm -rf $flinkVer; tar -xvzf $flinkTgz"
+		#cd $flinkVer
+		#scp $flinkTar tanle@$server:~/ 
+		#sudo apt-get install vim
+		#Replace localhost with resourcemanager in conf/flink-conf.yaml (jobmanager.rpc.address)
+		ssh $server "sed -i -e 's/jobmanager.rpc.address: localhost/jobmanager.rpc.address: nm/g' $flinkVer/conf/flink-conf.yaml"
+		ssh $server "sed -i -e 's/jobmanager.heap.mb: 256/taskmanager.heap.mb: 1024/g' $flinkVer/conf/flink-conf.yaml"
+		#total amount of memory per machine
+		#ssh $server "sed -i -e 's/taskmanager.heap.mb: 512/taskmanager.heap.mb: 4096/g' $flinkVer/conf/flink-conf.yaml"
+		#ssh $server "sed -i -e 's/taskmanager.heap.mb: 512/taskmanager.heap.mb: 16384/g' $flinkVer/conf/flink-conf.yaml"
+		ssh $server "sed -i -e 's/taskmanager.heap.mb: 512/taskmanager.heap.mb: 32768/g' $flinkVer/conf/flink-conf.yaml"
+		#Setup the number of task slots = total number of CPUs/ machine
+		ssh $server "sed -i -e 's/taskmanager.numberOfTaskSlots: 1/taskmanager.numberOfTaskSlots: 32/g' $flinkVer/conf/flink-conf.yaml"
+		#Setup the threads = total number of CPUs in the cluster
+		#ssh $server "sed -i -e 's/parallelism.default: 1/parallelism.default: 256/g' $flinkVer/conf/flink-conf.yaml"
+		ssh $server "sed -i -e 's/parallelism.default: 1/parallelism.default: 8/g' $flinkVer/conf/flink-conf.yaml"
+		#Add hostnames of all worker nodes to the slaves file flinkVer/conf/slaves"
+		ssh $server "rm -rf $flinkVer/conf/slaves"
+		for slave in $slaveNodes; do
+			ssh $server "echo $slave >> $flinkVer/conf/slaves"
+		done	
 	done
-	rm -rf flink*
-
 fi
 
 
-if $startFlink	
+if $startFlinkStandalone	
 then
 	ssh $masterNode "$flinkVer/bin/stop-cluster.sh"
 	ssh $masterNode "$flinkVer/bin/start-cluster.sh"
-	ssh $masterNode "$flinkVer/bin/yarn-session.sh -n $numOfworkers -tm 8192"
+fi	
+if $startFlinkYarn
+then
+	echo ############################ start Yars session for Flink#########################
+#	ssh $masterNode "$flinkVer/bin/stop-cluster.sh"
+	ssh $masterNode "$flinkVer/bin/yarn-session.sh -n $numOfworkers -d -jm 1024 -tm 32768 -s 4"
 fi
 
-################
 
-
-####################### TEST CASES ######################
+############################################### TEST CASES ###########################################
 # upload test cases
 if $isUploadTestCase 
 then 
 	cd $flinkSrc	
 	rm -rf test/wordcount/*.txt test/wordcount/*.out test/wordcount/*.log
 	tar zcvf test.tar test
-	for server in $serverList; do
+#	for server in $serverList; do
 		ssh tanle@$masterNode 'rm -rf test*'
-		scp test.tar tanle@$server:~/ 
-	done
+		scp test.tar tanle@$masterNode:~/ 
+		ssh tanle@$masterNode 'tar -xvzf test.tar'
+#	done
 
 	rm -rf test.tar
 fi
