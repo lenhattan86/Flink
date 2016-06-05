@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 java_home='/usr/lib/jvm/java-8-oracle'
 
 hadoopVer="hadoop-2.7.0"
@@ -17,18 +15,18 @@ testCase="/home/tan/projects/Flink/test/wordcount"
 
 REBOOT=false
 
-isTest=false
+isTest=true
 
 isInitPath=false
 
-isUploadKey=false
-isGenerateKey=false
-isPasswordlessSSH=false
+isUploadKey=true
+isGenerateKey=true
+isPasswordlessSSH=true
 
 isInstallJava=false
 
 isInstallGanglia=false
-startGanglia=true
+startGanglia=false
 if $isInstallGanglia
 then
 	startGanglia=true
@@ -38,7 +36,7 @@ isInstallHadoop=false
 isModifyHadoop=false
 
 isShutDownHadoop=false
-restartHadoop=true
+restartHadoop=false
 if $isInstallHadoop
 then
 	isShutDownHadoop=true
@@ -47,7 +45,7 @@ fi
 
 isUploadFlink=false
 isModifyFlink=false
-startFlinkYarn=true
+startFlinkYarn=false
 shudownFlink=false
 
 startFlinkStandalone=false # not necessary
@@ -67,8 +65,8 @@ clientNode="ctl"
 if $isTest
 then
 	numOfworkers=1
-	serverList="nm cp-2"
-	slaveNodes="cp-2"
+	serverList="nm cp-1"
+	slaveNodes="cp-1"
 else
 	numOfworkers=8
 	serverList="nm cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8"
@@ -90,40 +88,54 @@ if $isUploadKey
 then		
 	if $isGenerateKey 
 	then 	
-		ssh-keygen -t dsa -P '' -f ~/.ssh/id_dsa 
+		sudo chmod 777 $HOME/.ssh
+		sudo rm -rf $HOME/.ssh/id_dsa*
+		sudo rm -rf $HOME/.ssh/authorized_keys*
+		yes Y | ssh-keygen -t dsa -P '' -f ~/.ssh/id_dsa 
+		#cat /home/tan/Dropbox/Papers/System/Flink/cloudlab/cloudlab.pem >> $HOME/.ssh/authorized_keys
+		sudo chmod 777 $HOME/.ssh/id_dsa*		
+		rm -rf ~/.ssh/known_hosts
+		sudo cat $HOME/.ssh/id_dsa.pub >> $HOME/.ssh/authorized_keys
+		cat /home/tanle/Dropbox/Papers/System/Flink/cloudlab/cloudlab.pem >> $HOME/.ssh/authorized_keys
+		#sudo chmod 0600 $HOME/.ssh/authorized_keys
+		sudo chmod 777 $HOME/.ssh/config
+		echo 'StrictHostKeyChecking no' >> ~/.ssh/config
+		sudo chmod 0600 $HOME/.ssh/config
 	fi
-
+	
 	for server in $serverList; do
+		echo upload keys to $server
+#		ssh tanle@$server 'sudo rm -rf $HOME/.ssh/id_dsa*'
 		scp ~/.ssh/id_dsa* tanle@$server:~/.ssh/
-		ssh-copy-id -i ~/.ssh/id_dsa.pub tanle@$server
-		# run cat $HOME/.ssh/id_dsa.pub >> $HOME/.ssh/authorized_keys on each node
-		ssh tanle@$server 'cat $HOME/.ssh/id_dsa.pub >> $HOME/.ssh/authorized_keys'
-		ssh tanle@$server 'chmod 0600 ~/.ssh/authorized_keys'
+		ssh tanle@$server "cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys ;
+		 chmod 0600 ~/.ssh/id_dsa*; 
+		 chmod 0600 ~/.ssh/authorized_keys; 
+		 rm -rf ~/.ssh/known_hosts; 	
+		 echo 'StrictHostKeyChecking no' > ~/.ssh/config"
+		ssh tanle@$server "echo password less from localhost to $server"
 	done	
+	rm -rf ~/.ssh/known_hosts
 fi
 if $isPasswordlessSSH
 then
+	passwordlessSSH () { echo $1 to $2;	ssh tanle@$1 "ssh $2 'echo test passwordless SSH'" ;}
 	for server1 in $serverList; do
 		for server2 in $serverList; do
-		echo $server1 to $server2
-		ssh tanle@$server1 "ssh $server2 'echo test passwordless SSH'"
-		#ssh tanle@$server1 "scp temp.txt tanle@$server2"
+			passwordlessSSH $server1 $server2 
 		done
 	done
 fi
 ################################# install JAVA ######################################
 if $isInstallJava
 then
+	installJava () {
+		ssh tanle@$1 'apt-get install openjdk-8-jdk';
+#		ssh tanle@$1 'sudo update-alternatives --config java';
+#		ssh tanle@$1 'sudo update-alternatives --config javac';
+	}
 	echo "TODO: install JAVA"
 	for server in $serverList; do
-		ssh tanle@$server 'echo sudo apt-get install python-software-properties'
-		ssh tanle@$server 'sudo apt-get install software-properties-common python-software-properties'
-		ssh tanle@$server 'sudo add-apt-repository ppa:webupd8team/java'
-		ssh tanle@$server 'sudo apt-get update'
-		ssh tanle@$server 'sudo apt-get install oracle-java8-installer'
-		ssh tanle@$server 'sudo update-alternatives --config java'
-		ssh tanle@$server 'sudo update-alternatives --config javac'
-		#ssh tanle@$server "echo export JAVA_HOME=$java_home >> .bashrc"	
+		installJava $server &
 	done
 fi
 
@@ -133,26 +145,31 @@ fi
 if $isInstallGanglia
 then
 	echo "Configure Ganglia master node $masterNode"
-	#ssh tanle@$masterNode 'yes Y | sudo apt-get autoremove ganglia-monitor rrdtool gmetad ganglia-webfrontend'
+	ssh tanle@$masterNode 'yes Y | sudo apt-get purge ganglia-monitor gmetad'
 	### PLZ manually install Ganglia as we need to respond to some pop-ups
-	#ssh tanle@$masterNode 'sudo apt-get install -y ganglia-monitor rrdtool gmetad ganglia-webfrontend'
 	# we may restart the Apache2 twice
+	#ssh tanle@$masterNode 'sudo apt-get install -y ganglia-monitor rrdtool  rrdtool  ganglia-webfrontend'
+	ssh tanle@$masterNode 'sudo apt-get install -y ganglia-monitor gmetad'
+	
 	# 
-	#ssh tanle@$masterNode 'sudo cp /etc/ganglia-webfrontend/apache.conf /etc/apache2/sites-enabled/ganglia.conf'
+	ssh tanle@$masterNode 'sudo cp /etc/ganglia-webfrontend/apache.conf /etc/apache2/sites-enabled/ganglia.conf'
 	# change data_source 'SBU Flink' 1 localhost
-	#ssh tanle@$masterNode "sudo sed -i -e 's/data_source \'my cluster\" localhost/data_source \"SBU Flink\" 1 mn cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8/g' /etc/ganglia/gmetad.conf"
-	#ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"sbu flink\" 1 localhost/data_source \"sbu flink\" 1 mn cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8/g' /etc/ganglia/gmetad.conf"
-	if $isTest
-		ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"sbu flink\" 1 mn cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8/data_source \"sbu flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
-#		ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"my cluster\" localhost/data_source \"sbu flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
+	#ganglia.conf
+	ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"my cluster\" localhost/data_source \"sbu flink\" 1 localhost/g' /etc/ganglia/gmetad.conf"
+	#gmond.conf
+	ssh tanle@$masterNode "sudo sed -i -e 's/name = \"unidentified\"/name = \"sbu flink\"/g' /etc/ganglia/gmond.conf"
+	ssh tanle@$masterNode "sudo sed -i -e 's/mcast_join = 239.2.11.71/#mcast_join = 239.2.11.71/g' /etc/ganglia/gmond.conf"
+	ssh tanle@$masterNode "sudo sed -i -e 's/bind = 239.2.11.71/#bind = 239.2.11.71/g' /etc/ganglia/gmond.conf"
+	ssh tanle@$masterNode "sudo sed '/udp_send_channel {/a host=nm' /etc/ganglia/gmond.conf"
+	#ssh tanle@$masterNode "sudo sed -i -e 's/ / /g' /etc/ganglia/gmond.conf"
 
-	then
-		#ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"my cluster\" localhost/data_source \"SBU Flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
-		ssh tanle@$masterNode "sudo sed -i -e 's/data_source \"sbu flink\" 1 localhost/data_source \"SBU Flink\" 1 $serverList/g' /etc/ganglia/gmetad.conf"
-	fi
-	#The gmond.conf file configures where the node sends its information.
-	#ssh tanle@$masterNode 'sudo vi /etc/ganglia/gmond.conf' # modify cluster, udp_send_channel sections
-#	ssh tanle@$masterNode "sed -i -e \"s/data_source 'my cluster' localhost/data_source 1 'SBU Flink'/g\" /etc/ganglia/gmetad.conf"
+	for server in $serverList; do
+		ssh tanle@$server 'sudo apt-get install -y ganglia-monitor'
+		ssh tanle@$masterNode "sudo sed -i -e 's/name = \"unidentified\"/name = \"sbu flink\"/g' /etc/ganglia/gmond.conf"
+		ssh tanle@$masterNode "sudo sed -i -e 's/bind = 239.2.11.71/#bind = 239.2.11.71/g' /etc/ganglia/gmond.conf"
+		ssh tanle@$masterNode "sudo sed '/udp_send_channel {/a host=nm' /etc/ganglia/gmond.conf"
+	done	
+
 fi
 
 if $startGanglia
@@ -161,13 +178,7 @@ then
 	# restart all related services
 	ssh tanle@$masterNode 'sudo service ganglia-monitor restart & sudo service gmetad restart & sudo service apache2 restart'
 	for server in $slaveNodes; do
-		#ssh tanle@$server 'yes Y | sudo apt-get install -y ganglia-monitor'
-		#ssh tanle@$server 'yes Y | sudo apt-get install -y ganglia-monitor'
-		#ssh tanle@$server 'sudo vi /etc/ganglia/gmond.conf'
-		# modify cluster, udp_send_channel sections : unspecified -> SBU Flink
-		# comment out udp_recv_channel
-		# restart all related services
-		ssh tanle@$server 'sudo service ganglia-monitor restart' 
+		ssh tanle@$server 'sudo service ganglia-monitor restart' &
 	done	
 fi
 
