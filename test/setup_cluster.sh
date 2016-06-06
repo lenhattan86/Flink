@@ -5,11 +5,13 @@
 
 ###########
 vmemRatio=4
-yarnNodeMem=32768
+yarnNodeMem=65536 # 32768
 yarnMaxMem=32768
 #scheduler="org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler"
 scheduler="org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler"
 yarnVcores=32
+hdfsDir="/dev/hdfs"
+numOfReplication=3
 ########
 
 cloudLabPubKey="/home/tanle/Dropbox/Papers/System/Flink/cloudlab/cloudlab.pem"
@@ -26,7 +28,7 @@ flinkDownloadLink="http://apache.mesi.com.ar/flink/flink-1.0.3/flink-1.0.3-bin-h
 flinkSrc="/home/tan/projects/Flink"
 testCase="/home/tan/projects/Flink/test/wordcount"
 
-REBOOT=true
+REBOOT=false
 isTest=true
 
 
@@ -47,12 +49,12 @@ then
 	startGanglia=true
 fi
 
-isInstallHadoop=false
+isInstallHadoop=true
 isInitPath=false
 isModifyHadoop=false
 
 isShutDownHadoop=false
-restartHadoop=true
+restartHadoop=false
 if $isInstallHadoop
 then
 	isShutDownHadoop=true
@@ -79,6 +81,7 @@ then
 	numOfworkers=1
 	serverList="nm cp-1"
 	slaveNodes="cp-1"
+	numOfReplication=1
 else
 	numOfworkers=8
 	serverList="nm cp-1 cp-2 cp-3 cp-4 cp-5 cp-6 cp-7 cp-8 cp-9 cp-10 cp-11 cp-12 cp-13 cp-14"
@@ -114,17 +117,13 @@ then
 		sudo rm -rf $HOME/.ssh/authorized_keys*
 		yes Y | ssh-keygen -t dsa -P '' -f ~/.ssh/id_dsa 		
 		sudo chmod 600 $HOME/.ssh/id_dsa*
-#		sudo cat $HOME/.ssh/id_dsa.pub >> $HOME/.ssh/authorized_keys
+		echo 'StrictHostKeyChecking no' >> ~/.ssh/config
 #		ssh-add $cloudLabPubKey
-#		cat $cloudLabPubKey >> $HOME/.ssh/authorized_keys
-#		sudo chmod 0600 $HOME/.ssh/authorized_keys
-#		echo 'StrictHostKeyChecking no' >> ~/.ssh/config
-#		sudo chmod 0600 $HOME/.ssh/config
 	fi
 	rm -rf ~/.ssh/known_hosts
 	for server in $serverList; do
 		echo upload keys to $server
-#		ssh tanle@$server 'sudo rm -rf $HOME/.ssh/id_dsa*'
+		ssh tanle@$server 'sudo rm -rf $HOME/.ssh/id_dsa*'
 		scp ~/.ssh/id_dsa* tanle@$server:~/.ssh/
 		ssh tanle@$server "cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys ;
 		 chmod 0600 ~/.ssh/id_dsa*; 
@@ -273,7 +272,6 @@ echo "==========install Hadoop Yarn=========="
 			fi
 
 			# etc/hadoop/core-site.xml
-			hdfsDir="/dev/hdfs"
 			ssh tanle@$1 "sudo rm -rf $hdfsDir; sudo mkdir $hdfsDir; sudo chmod 777 $hdfsDir"
 
 			ssh tanle@$1 "echo '<?xml version=\"1.0\" encoding=\"UTF-8\"?>
@@ -301,13 +299,20 @@ echo "==========install Hadoop Yarn=========="
 ssh tanle@$1 "echo '<?xml version=\"1.0\" encoding=\"UTF-8\"?> 
 <?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>
 <configuration>
-    <property>
-        <name>dfs.replication</name>
-        <value>$numOfworkers</value>
-    </property>
+
+  <property> 
+    <name>dfs.replication</name>
+    <value>$numOfReplication</value>
+  </property>
+
   <property>
     <name>dfs.blocksize</name>
     <value>268435456</value>
+  </property>
+
+  <property>
+    <name>dfs.namenode.handler.count</name>
+    <value>100</value>
   </property>
 
 </configuration>' > $hadoopVer/etc/hadoop/hdfs-site.xml"
@@ -325,37 +330,38 @@ ssh tanle@$1 "echo '<?xml version=\"1.0\" encoding=\"UTF-8\"?>
   </property>
 
   <property>
-    <name>yarn.resourcemanager.hostname</name>
-    <value>$masterNode</value>
-  </property>
-
-
-<property>
-	<name>yarn.resourcemanager.address</name>
-	<value>$masterNode:8032</value>
-</property>
-<property>
-	<name>yarn.resourcemanager.scheduler.address</name>
-	<value>$masterNode:8030</value>
-</property>
-<property>
-	<name>yarn.resourcemanager.resource-tracker.address</name>
-	<value>$masterNode:8031</value>
-</property>
-  
-  <property>
     <name>yarn.resourcemanager.scheduler.class</name>
     <value>$scheduler</value>
   </property>
 
   <property>
-    <name>yarn.scheduler.maximum-allocation-mb</name>
-    <value>1024</value>
+    <name>yarn.resourcemanager.address</name>
+    <value>nm:8040</value>
+  </property>
+
+  <property>
+    <name>yarn.resourcemanager.scheduler.address</name>
+    <value>nm:8030</value>
+  </property>
+
+  <property>
+    <name>yarn.resourcemanager.resource-tracker.address</name>
+    <value>nm:8025</value>
   </property>
 
   <property>
     <name>yarn.scheduler.maximum-allocation-mb</name>
     <value>$yarnMaxMem</value>
+  </property>
+
+  <property>
+    <name>yarn.nodemanager.resource.cpu-vcores</name>
+    <value>$yarnVcores</value>
+  </property>
+
+  <property>
+    <name>yarn.scheduler.maximum-allocation-vcores</name>
+    <value>32</value>
   </property>
 
   <property>
@@ -367,16 +373,8 @@ ssh tanle@$1 "echo '<?xml version=\"1.0\" encoding=\"UTF-8\"?>
     <name>yarn.nodemanager.vmem-pmem-ratio</name>
     <value>$vmemRatio</value>
   </property>
-
-  <property>
-    <name>yarn.scheduler.maximum-allocation-vcores</name>
-    <value>$yarnVcores</value>
-  </property>
-
 </configuration>' > $hadoopVer/etc/hadoop/yarn-site.xml"
 
-if true
-then
 			# etc/hadoop/mapred-site.xml
 			ssh tanle@$1 "echo '<?xml version=\"1.0\"?>
 <?xml-stylesheet type=\"text/xsl\" href=\"configuration.xsl\"?>
@@ -423,7 +421,6 @@ then
   </property>
 
 </configuration>' > $hadoopVer/etc/hadoop/mapred-site.xml"	
-fi		
 
 			# monitoring script in etc/hadoop/yarn-site.xml
 
@@ -445,10 +442,10 @@ fi
 
 if $restartHadoop
 then
-	for server in $serverList; do
-		ssh tanle@$server "sudo sh -c 'echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6'" &
-	done
-	wait
+	#for server in $serverList; do
+	#	ssh tanle@$server "sudo sh -c 'echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6'" &
+	#done
+	#wait
 
 	# shutdown all before starting.
 
@@ -456,6 +453,7 @@ then
 	ssh tanle@$masterNode "$hadoopVer/sbin/stop-yarn.sh"
 	echo '============================ starting Hadoop==================================='
 	# operating HDFS
+#	ssh tanle@$masterNode "sudo rm -rf $hdfsDir; sudo mkdir $hdfsDir; sudo chmod 777 $hdfsDir"
 	ssh tanle@$masterNode "yes Y | $hadoopVer/bin/hdfs namenode -format HDFS4Flink"
 	ssh tanle@$masterNode "$hadoopVer/sbin/start-dfs.sh"
 	echo '============================ starting Yarn==================================='
